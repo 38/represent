@@ -24,7 +24,7 @@ if(argv[1] == "start")
 	setup_tcp(1234);
 }
 
-runtime.servlet.path = ".:" + runtime.servlet.path;       /* the servlet search path */
+runtime.servlet.path = "bin:" + runtime.servlet.path;       /* the servlet search path */
 
 scheduler.default_itc_pipe = "pipe.mem";  /* set the default ITC communication pipe */
 scheduler.worker.nthreads = 4;            /* the number of working thread */

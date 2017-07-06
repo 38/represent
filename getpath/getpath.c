@@ -14,10 +14,13 @@ typedef struct {
 	pipe_t path;
 	pipe_t host;
 	pipe_t error;
+	pipe_t method;
+	pipe_t payload;
 
 	pstd_type_model_t*   type_model;
 	pstd_type_accessor_t path_token;
 	pstd_type_accessor_t host_token;
+	pstd_type_accessor_t payload_token;
 } servlet_data_t;
 int init(uint32_t argc, char const* const* argv, void* data)
 {
@@ -28,6 +31,8 @@ int init(uint32_t argc, char const* const* argv, void* data)
 	sd->path    = pipe_define("path", PIPE_OUTPUT, "plumber/std/request_local/String");
 	sd->error   = pipe_define("error", PIPE_OUTPUT, NULL);
 	sd->host    = pipe_define("host", PIPE_OUTPUT, "plumber/std/request_local/String");
+	sd->method  = pipe_define("method", PIPE_OUTPUT, NULL);
+	sd->payload = pipe_define("payload", PIPE_OUTPUT, "plumber/std/request_local/String");
 
 	if(sd->request == (pipe_t)-1 || sd->path == (pipe_t)-1 || sd->error == (pipe_t)-1)
 	{
@@ -38,14 +43,23 @@ int init(uint32_t argc, char const* const* argv, void* data)
 	sd->type_model = pstd_type_model_new();
 	sd->path_token = pstd_type_model_get_accessor(sd->type_model, sd->path, "token");
 	sd->host_token = pstd_type_model_get_accessor(sd->type_model, sd->host, "token");
+	sd->payload_token = pstd_type_model_get_accessor(sd->type_model, sd->payload, "token");
 
 	return 0;
 }
 typedef struct {
 	enum {
-		GET_G,
-		GET_E,
-		GET_T,
+		GET_METHOD,
+		GET_GE,
+		GET_GET,
+		GET_PO,
+		GET_POS,
+		GET_POST,
+		GET_DE,
+		GET_DEL,
+		GET_DELE,
+		GET_DELET,
+		GET_DELETE,
 		GET_URL_WS,
 		URL,
 		GET_PARAM,
@@ -62,6 +76,7 @@ typedef struct {
 		FIELD_LF,
 		//	REQUEST_CR,
 		REQUEST_LF,
+		PAYLOAD,
 		OK,
 		ERR
 	} ps;                  /* parser state */
@@ -71,23 +86,31 @@ typedef struct {
 	size_t field_value_length;
 	int keep_alive;
 	int has_data;
+	int payload_size;
+	char method;
 	char path[1024];
 	char host[512];
 	size_t path_length;
+	size_t payload_length;
+	char* payload;
 } _state_t;
 static inline _state_t* _state_new()
 {
 	_state_t* state = (_state_t*)malloc(sizeof(_state_t));
-	state->ps = GET_G;
+	state->ps = GET_METHOD;
 	state->keep_alive = 1;
 	state->has_data = 0;
 	state->field_name_length = state->field_value_length  = state->path_length = 0;
 	state->host[0] = 0;
+	state->payload_size = 0;
+	state->payload_length = 0;
+	state->payload = NULL;
 	return state;
 }
 
 static inline int _state_free(_state_t* state)
 {
+	free(state->payload);
 	free(state);
 	return 0;
 }
@@ -166,9 +189,22 @@ int _exec(void* data)
 			char ch = buffer[rem];
 			switch(state->ps)
 			{
-				case GET_G: _EXPECT('G', GET_E);
-				case GET_E: _EXPECT('E', GET_T);
-				case GET_T: _EXPECT('T', GET_URL_WS);
+				case GET_METHOD:
+					if(ch == 'G') state->ps = GET_GE, state->method = 'G';
+					else if(ch == 'P') state->ps = GET_PO, state->method = 'P';
+					else if(ch == 'D') state->ps = GET_DE, state->method = 'D';
+					else state->ps = ERR;
+					break;
+				case GET_GE: _EXPECT('E', GET_GET);
+				case GET_GET: _EXPECT('T', GET_URL_WS);
+				case GET_PO: _EXPECT('O', GET_POS);
+				case GET_POS: _EXPECT('S', GET_POST);
+				case GET_POST: _EXPECT('T', GET_URL_WS);
+				case GET_DE: _EXPECT('E', GET_DEL);
+				case GET_DEL: _EXPECT('L', GET_DELE);
+				case GET_DELE: _EXPECT('E', GET_DELET);
+				case GET_DELET: _EXPECT('T', GET_DELETE);
+				case GET_DELETE: _EXPECT('E', GET_URL_WS);
 				case GET_URL_WS: _WS(URL);
 				case URL: _FILL_BUFFER(ch == ' ' || ch == '\t' || ch == '?', path, GET_PARAM, ch);
 				case GET_PARAM: _SKIP(ch == ' ' || ch == '\t'); state->ps = URL_VER_WS; 
@@ -195,7 +231,12 @@ int _exec(void* data)
 				case FIELD_VLAUE: _FILL_BUFFER(ch == '\r', field_value, FIELD_CR, (ch | (0x20 & (ch >> 1))));
 				case FIELD_CR: _EXPECT('\r', FIELD_LF);
 				case FIELD_LF: _EXPECT('\n', FIELD);
-				case REQUEST_LF: _EXPECT('\n', OK);
+				case REQUEST_LF: _EXPECT('\n', PAYLOAD);
+				case PAYLOAD: 
+					if(state->payload != NULL) 
+					{
+						_FILL_BUFFER(state->payload_length == state->payload_size, payload, OK, ch);
+					}
 				default: LOG_ERROR("Bug!");
 			}
 			if(state->ps == FIELD_LF)
@@ -204,6 +245,12 @@ int _exec(void* data)
 				    state->keep_alive = 1;
 				if(strcmp(state->field_name, "host") == 0)
 				    strcpy(state->host, state->field_value);
+				if(strcmp(state->field_name, "content-length") == 0)
+				{
+					state->payload_size = atoi(state->field_value);
+					state->payload = malloc((size_t)state->payload_size);
+				}
+
 				state->field_name_length = state->field_value_length = 0;
 				state->field_name[0] = state->field_value[0] = 0;
 			}
@@ -243,6 +290,14 @@ int _exec(void* data)
 		pstd_string_write(pstr, state->host, strlen(state->host));
 		scope_token_t st = pstd_string_commit(pstr);
 		PSTD_TYPE_INST_WRITE_PRIMITIVE(inst, sd->host_token, st); 
+	}
+
+	if(state->payload != NULL && state->payload[0])
+	{
+		pstd_string_t* pstr = pstd_string_new(strlen(state->payload) + 1);
+		pstd_string_write(pstr, state->host, strlen(state->payload));
+		scope_token_t st = pstd_string_commit(pstr);
+		PSTD_TYPE_INST_WRITE_PRIMITIVE(inst, sd->payload_token, st); 
 	}
 
 	if(new_state == 1)

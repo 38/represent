@@ -12,8 +12,8 @@ var server = {
 	error       := "dataflow/firstnonempty 5";
 	genres      := "response";
 
-	cvt         := "typing/conversion/str2raw"
-	myserv      := "language/pyservlet myserv";
+	//cvt         := "typing/conversion/str2raw"
+	//myserv      := "language/pyservlet myserv";
 
 	/* Parse the request */
 	() -> "request" parsereq {
@@ -24,7 +24,7 @@ var server = {
 				"prefix" -> "cond";
 				"relative" -> "data";
 			} selector {
-				"out0"    -> "input" cvt "output" -> "input" myserv;   
+				//"out0"    -> "input" cvt "output" -> "input" myserv;   
 				"default" -> "path" reader "result" -> "file" genres "output" -> ();
 			}
 		};

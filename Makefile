@@ -5,8 +5,8 @@ SERVLETS=getpath response
 BINARIES=$(foreach serv,$(SERVLETS),bin/lib$(serv).so)
 
 LINKER=gcc
-LDFLAGS:=$(LDFLAGS) -L$(PLUMBER_PREFIX)/lib -lpstd -lproto
-CFLAGS:=$(CFLAGS) -I$(PLUMBER_PREFIX)/include/pstd -I$(PLUMBER_PREFIX)/include/proto
+LDFLAGS:=$(LDFLAGS) -g -L$(PLUMBER_PREFIX)/lib -lpstd -lproto
+CFLAGS:=$(CFLAGS) -g -I$(PLUMBER_PREFIX)/include/pstd -I$(PLUMBER_PREFIX)/include/proto
 
 PARAM=LINKER="$(LINKER)" OUTPUT="../$(OUTPUT)" LDFLAGS="$(LDFLAGS)" CFLAGS="$(CFLAGS)"
 
