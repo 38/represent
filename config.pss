@@ -1,0 +1,37 @@
+/* insmod the required modules */
+if(pipe.mem == undefined) insmod("mem_pipe");
+if(plumber.std == undefined) insmod("pssm");
+
+
+/* setup the HTTP port */
+var setup_tcp = function(port) 
+{
+	var path = "pipe.tcp.port_" + port;
+	if($global[path] == undefined) 
+		insmod("tcp_pipe " + port);
+	$global[path + ".size"]      = 65536;
+	$global[path + ".ttl"]       = 240;
+	$global[path + ".reuseaddr"] = 1;
+	$global[path + ".ipv6"]      = 1;
+};
+
+var ssl_cert = "cert/haohou.info/cert.pem";
+var ssl_key  = "cert/haohou.info/privkey.pem";
+var cert_chain = "cert/haohou.info/chain.pem";
+
+if(argv[1] == "start")
+{
+	setup_tcp(1234);
+}
+
+runtime.servlet.path = ".:" + runtime.servlet.path;       /* the servlet search path */
+
+scheduler.default_itc_pipe = "pipe.mem";  /* set the default ITC communication pipe */
+scheduler.worker.nthreads = 4;            /* the number of working thread */
+
+default_name = "default"
+default_dir = "site/default"
+
+mime_type_file = "./mime.types";   /* the mime.types file */
+
+

@@ -1,0 +1,55 @@
+#!/home/haohou/bin/pscript
+
+import("service");
+import("config.pss");
+	
+var server = {
+	parsereq    := "getpath";
+	parsepath   := "filesystem/parsepath --ext-name -L 1";
+	guessmime   := "filesystem/mimetype " + mime_type_file;
+	reader      := "filesystem/readfile site/default";
+	selector    := "dataflow/demux /api";
+	error       := "dataflow/firstnonempty 5";
+	genres      := "response";
+
+	cvt         := "typing/conversion/str2raw"
+	myserv      := "language/pyservlet myserv";
+
+	/* Parse the request */
+	() -> "request" parsereq {
+		"path" -> "origin" parsepath 
+		{
+			"extname" -> "extname" guessmime "mimetype" -> "mime" genres;
+			{
+				"prefix" -> "cond";
+				"relative" -> "data";
+			} selector {
+				"out0"    -> "input" cvt "output" -> "input" myserv;   
+				"default" -> "path" reader "result" -> "file" genres "output" -> ();
+			}
+		};
+	};
+	
+
+	/* Handle the internal error */
+	{
+		parsereq   "__error__" -> "in0";
+		parsepath  "__error__" -> "in1";
+		guessmime  "__error__" -> "in2";
+		reader     "__error__" -> "in3";
+		selector   "__error__" -> "in4";
+	} error "out" -> "500" genres;
+
+	/* Handle the 400 error */
+	parsereq "error" -> "400" genres;
+
+	/* Handle the 403 error */
+	parsepath "__null__" -> "403" genres;
+};
+
+/* dump the visualization graph */
+Service.visualize(server);
+
+/* then start the file server */
+if(argv[1] == "start")
+	Service.start(server);
