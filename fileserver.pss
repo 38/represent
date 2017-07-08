@@ -4,7 +4,7 @@ import("service");
 import("config.pss");
 	
 var server = {
-	parsereq    := "getpath";
+	parsereq    := "parsereq";
 	parsepath   := "filesystem/parsepath --ext-name -L 1";
 	guessmime   := "filesystem/mimetype " + mime_type_file;
 	reader      := "filesystem/readfile site/default";

@@ -1,6 +1,6 @@
 include configure.mk 
 
-SERVLETS=getpath response
+SERVLETS=parsereq response
 
 BINARIES=$(foreach serv,$(SERVLETS),bin/lib$(serv).so)
 
@@ -29,6 +29,7 @@ __check_environment__:
 .PHONY: clean
 
 clean:
+	rm -f *.psm
 	for serv in $(SERVLETS); do \
 		cd $${serv}; \
 		make -f $(PLUMBER_PREFIX)/lib/plumber/servlet.mk clean $(PARAM); \

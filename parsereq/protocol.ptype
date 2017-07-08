@@ -1,0 +1,8 @@
+package represent.parsereq;
+
+type Request {
+	plumber.std.request_local.String  path;
+	plumber.std.request_local.String  method;
+	plumber.std.request_local.String  cookie;
+	plumber.std.request_local.String  payload;
+};
